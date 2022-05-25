@@ -2,8 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const app = express()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const jwt = require('jsonwebtoken');
 require('dotenv').config()
+const jwt = require('jsonwebtoken');
 
 const port = process.env.PORT || 5001
 
@@ -14,6 +14,7 @@ app.use(express.json())
 // pass : TxGdW9ZxMBEpfMPF
 function verifyJWT(req, res, next) {
     const authHeader = req.headers.authorization
+    console.log(authHeader)
     if (!authHeader) {
         return res.status(401).send({ message: 'Unauthorized Access' })
     }
@@ -50,45 +51,52 @@ async function run() {
             res.send(production)
         })
 
-        app.post('/orders', async (req, res) => {
+        app.post('/orders/:email', verifyJWT, async (req, res) => {
             const query = req.body
-            const result = await orderCollection.insertOne(query)
+            const email = req.params.email
+            const decodedEmail = req.decoded.email
+            if (email === decodedEmail) {
+                const result = await orderCollection.insertOne(query)
+                res.send(result)
+            }
+
+        })
+        app.patch('/update/:id', async (req, res) => {
+            const id = req.params.id
+            const newQuantity = req.body
+            const filter = { _id: ObjectId(id) }
+            const updateDoc = {
+                $set: newQuantity
+            }
+            const result = await manufacturerCollection.updateOne(filter, updateDoc)
             res.send(result)
         })
-        // app.post('/orders', async (req, res) => {
-        //     const query = req.body
-        //     const result = await userCollection.insertOne(query)
+
+        app.post('/user', (req, res) => {
+            const query = req.body
+            const jotToken = jwt.sign({ email: query.email }, process.env.ACCESS_SECRET_TOKEN, { expiresIn: "1h" })
+            if (jotToken) {
+                res.send({ success: true, jotToken })
+            }
+            else {
+                res.send({ success: false })
+            }
+        })
+
+
+        // app.put('/update/:id', async (req, res) => {
+        //     const id = req.params.id
+        //     const updateQuantity = req.body
+        //     const filter = { _id: ObjectId(id) }
+        //     const options = { upsert: true }
+        //     const updateDoc = {
+        //         $set: {
+        //             quantity: updateQuantity.quantity
+        //         }
+        //     }
+        //     const result = await manufacturerCollection.updateOne(filter, updateDoc, options)
         //     res.send(result)
         // })
-
-        app.put('/user/:email', verifyJWT, async (req, res) => {
-            const email = req.params.email
-            const user = req.body
-            const filter = { email: email }
-            const options = { upsert: true }
-            const updateDoc = {
-                $set: {
-                    user
-                }
-            }
-            const result = await userCollection.updateOne(filter, updateDoc, options)
-            const accessToken = jwt.sign({ email: email }, process.env.ACCESS_SECRET_TOKEN, { expiresIn: '1d' })
-            res.send({ result, accessToken })
-        })
-
-        app.put('/update/:id', async (req, res) => {
-            const id = req.params.id
-            const updateQuantity = req.body
-            const filter = { _id: ObjectId(id) }
-            const options = { upsert: true }
-            const updateDoc = {
-                $set: {
-                    quantity: updateQuantity.quantity
-                }
-            }
-            const result = await manufacturerCollection.updateOne(filter, updateDoc, options)
-            res.send(result)
-        })
     }
     finally {
 
