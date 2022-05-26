@@ -4,7 +4,7 @@ const app = express()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const jwt = require('jsonwebtoken');
-
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5001
 
 app.use(cors())
@@ -40,6 +40,18 @@ async function run() {
         const userCollection = client.db("manufacturer-collection").collection("users");
         const orderCollection = client.db("manufacturer-collection").collection("orders");
 
+        // create payment method api
+        app.post('/create-payment-intent', async (req, res) => {
+            const service = req.body
+            const price = service.price
+            const amount = price * 100
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_type: ['card']
+            })
+            res.send({ clientSecret: paymentIntent.client_secret })
+        })
         app.get('/production', async (req, res) => {
             const production = await manufacturerCollection.find().toArray()
             res.send(production)
@@ -105,14 +117,28 @@ async function run() {
         })
 
         // show my order into the client site with thi api
-        app.get('/myorder/:email', async (req, res) => {
+        app.get('/myorder', verifyJWT, async (req, res) => {
             const decodedEmail = req.decoded.email
+            console.log(decodedEmail)
             const email = req.query.email
             if (email === decodedEmail) {
                 const query = { email: email }
                 const result = await userCollection.find(query).toArray()
                 res.send(result)
             }
+        })
+        app.get('/myorder/:id', verifyJWT, async (req, res) => {
+            const query = req.params.id
+            const id = { _id: ObjectId(query) }
+            const result = await userCollection.find(id).toArray()
+            res.send(result)
+        })
+        // delete single order by user 
+        app.delete('/myorder/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await userCollection.deleteOne(query)
+            res.send(result)
         })
     }
     finally {
