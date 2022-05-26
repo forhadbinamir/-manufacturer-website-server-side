@@ -72,9 +72,9 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/user', (req, res) => {
+        app.post('/user', async (req, res) => {
             const query = req.body
-            const jotToken = jwt.sign({ email: query.email }, process.env.ACCESS_SECRET_TOKEN, { expiresIn: "1h" })
+            const jotToken = jwt.sign({ email: query.email }, process.env.ACCESS_SECRET_TOKEN, { expiresIn: "1d" })
             if (jotToken) {
                 res.send({ success: true, jotToken })
             }
@@ -83,20 +83,37 @@ async function run() {
             }
         })
 
+        app.put('/update/:id', async (req, res) => {
+            const id = req.params.id
+            const updateQuantity = req.body
+            const filter = { _id: ObjectId(id) }
+            const options = { upsert: true }
+            const updateDoc = {
+                $set: {
+                    quantity: updateQuantity.quantity
+                }
+            }
+            const result = await manufacturerCollection.updateOne(filter, updateDoc, options)
+            res.send(result)
+        })
 
-        // app.put('/update/:id', async (req, res) => {
-        //     const id = req.params.id
-        //     const updateQuantity = req.body
-        //     const filter = { _id: ObjectId(id) }
-        //     const options = { upsert: true }
-        //     const updateDoc = {
-        //         $set: {
-        //             quantity: updateQuantity.quantity
-        //         }
-        //     }
-        //     const result = await manufacturerCollection.updateOne(filter, updateDoc, options)
-        //     res.send(result)
-        // })
+        // insert single person data by this api
+        app.post('/myorder', async (req, res) => {
+            const query = req.body
+            const result = await userCollection.insertOne(query)
+            res.send(result)
+        })
+
+        // show my order into the client site with thi api
+        app.get('/myorder/:email', async (req, res) => {
+            const decodedEmail = req.decoded.email
+            const email = req.query.email
+            if (email === decodedEmail) {
+                const query = { email: email }
+                const result = await userCollection.find(query).toArray()
+                res.send(result)
+            }
+        })
     }
     finally {
 
