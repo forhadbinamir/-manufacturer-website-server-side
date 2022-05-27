@@ -10,8 +10,7 @@ const port = process.env.PORT || 5001
 app.use(cors())
 app.use(express.json())
 
-// user: manufacturer
-// pass : TxGdW9ZxMBEpfMPF
+
 function verifyJWT(req, res, next) {
     const authHeader = req.headers.authorization
     console.log(authHeader)
@@ -39,7 +38,15 @@ async function run() {
         const manufacturerCollection = client.db("manufacturer-collection").collection("production");
         const userCollection = client.db("manufacturer-collection").collection("users");
         const orderCollection = client.db("manufacturer-collection").collection("orders");
+        const profileCollection = client.db("manufacturer-collection").collection("userInfo");
 
+
+        app.get('admin', async (req, res) => {
+            const email = req.params.email
+            const user = await userCollection.findOne({ email: email })
+            const isAdmin = user.role === 'admin'
+            res.send({ admin: isAdmin })
+        })
         // create payment method api
         app.post('/create-payment-intent', async (req, res) => {
             const service = req.body
@@ -140,6 +147,18 @@ async function run() {
             const result = await userCollection.deleteOne(query)
             res.send(result)
         })
+
+        app.post('/profile', async (req, res) => {
+            const query = req.body
+            const result = await profileCollection.insertOne(query)
+            res.send(result)
+        })
+        app.get('/profile', async (req, res) => {
+            const profile = await profileCollection.find().toArray()
+            res.send(profile)
+        })
+
+
     }
     finally {
 
