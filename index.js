@@ -39,14 +39,10 @@ async function run() {
         const userCollection = client.db("manufacturer-collection").collection("users");
         const orderCollection = client.db("manufacturer-collection").collection("orders");
         const profileCollection = client.db("manufacturer-collection").collection("userInfo");
+        const myCollection = client.db("manufacturer-collection").collection("myorder");
 
 
-        app.get('admin', async (req, res) => {
-            const email = req.params.email
-            const user = await userCollection.findOne({ email: email })
-            const isAdmin = user.role === 'admin'
-            res.send({ admin: isAdmin })
-        })
+
         // create payment method api
         app.post('/create-payment-intent', async (req, res) => {
             const service = req.body
@@ -68,6 +64,11 @@ async function run() {
             const query = { _id: ObjectId(id) }
             const production = await manufacturerCollection.findOne(query)
             res.send(production)
+        })
+        app.post('/production', verifyJWT, async (req, res) => {
+            const query = req.body
+            const result = await manufacturerCollection.insertOne(query)
+            res.send(result)
         })
 
         app.post('/orders/:email', verifyJWT, async (req, res) => {
@@ -91,15 +92,58 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/user', async (req, res) => {
-            const query = req.body
-            const jotToken = jwt.sign({ email: query.email }, process.env.ACCESS_SECRET_TOKEN, { expiresIn: "1d" })
+        app.get('/admin/:email', async (req, res) => {
+            const email = req.params.email
+            const user = await userCollection.findOne({ email: email })
+            const isAdmin = user.role === 'admin'
+            res.send({ admin: isAdmin })
+        })
+
+        app.get('/user', verifyJWT, async (req, res) => {
+            const users = await userCollection.find().toArray()
+            res.send(users)
+        })
+        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email
+            const requester = req.decoded.email
+            const requesterAccount = await userCollection.findOne({ email: requester })
+            if (requesterAccount.role === "admin") {
+                const filter = { email: email }
+                const updateDoc = {
+                    $set: { role: 'admin' }
+                }
+                const result = await userCollection.updateOne(filter, updateDoc)
+                res.send(result)
+            }
+            else {
+                res.status({ message: 'Forbidden' })
+            }
+
+        })
+
+        app.put('/user/:email', async (req, res) => {
+            const email = req.params.email
+            const user = req.body
+            const filter = { email: email }
+            const options = { upsert: true }
+            const updateDoc = {
+                $set: user
+            }
+            const result = await userCollection.updateOne(filter, updateDoc, options)
+            const jotToken = jwt.sign({ email: email }, process.env.ACCESS_SECRET_TOKEN, { expiresIn: "1d" })
             if (jotToken) {
-                res.send({ success: true, jotToken })
+                res.send({ success: true, result, jotToken })
             }
             else {
                 res.send({ success: false })
             }
+        })
+
+        app.delete('/user/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await userCollection.deleteOne(query)
+            res.send(result)
         })
 
         app.put('/update/:id', async (req, res) => {
@@ -119,7 +163,7 @@ async function run() {
         // insert single person data by this api
         app.post('/myorder', async (req, res) => {
             const query = req.body
-            const result = await userCollection.insertOne(query)
+            const result = await myCollection.insertOne(query)
             res.send(result)
         })
 
@@ -130,21 +174,21 @@ async function run() {
             const email = req.query.email
             if (email === decodedEmail) {
                 const query = { email: email }
-                const result = await userCollection.find(query).toArray()
+                const result = await myCollection.find(query).toArray()
                 res.send(result)
             }
         })
         app.get('/myorder/:id', verifyJWT, async (req, res) => {
             const query = req.params.id
             const id = { _id: ObjectId(query) }
-            const result = await userCollection.find(id).toArray()
+            const result = await myCollection.find(id).toArray()
             res.send(result)
         })
         // delete single order by user 
         app.delete('/myorder/:id', async (req, res) => {
             const id = req.params.id
             const query = { _id: ObjectId(id) }
-            const result = await userCollection.deleteOne(query)
+            const result = await myCollection.deleteOne(query)
             res.send(result)
         })
 
