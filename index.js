@@ -245,7 +245,7 @@ run().catch(console.dir)
 
 
 app.get('/man', (req, res) => {
-    res.send("Manufacturer server is running ok")
+    res.send("Manufacturer server is running")
 })
 
 app.listen(port, () => {
