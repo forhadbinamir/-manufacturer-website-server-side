@@ -244,7 +244,7 @@ async function run() {
 run().catch(console.dir)
 
 
-app.get('/man', (req, res) => {
+app.get('/', (req, res) => {
     res.send("Manufacturer server is running ok")
 })
 
