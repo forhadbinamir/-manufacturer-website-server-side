@@ -40,21 +40,49 @@ async function run() {
         const orderCollection = client.db("manufacturer-collection").collection("orders");
         const profileCollection = client.db("manufacturer-collection").collection("userInfo");
         const myCollection = client.db("manufacturer-collection").collection("myorder");
+        const paymentCollection = client.db("manufacturer-collection").collection("payment");
 
 
 
         // create payment method api
-        app.post('/create-payment-intent', async (req, res) => {
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
             const service = req.body
             const price = service.price
             const amount = price * 100
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: amount,
                 currency: 'usd',
-                payment_method_type: ['card']
+                payment_method_types: ['card']
             })
             res.send({ clientSecret: paymentIntent.client_secret })
         })
+
+        app.patch('/myorder/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id
+            const payment = req.body
+            const filter = { _id: ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const result = await paymentCollection.insertOne(payment)
+            const updateBooking = await myCollection.updateOne(filter, updateDoc)
+            res.send(updateBooking)
+        })
+
+        const verifyAdmin = async (req, res, next) => {
+            const requester = req.decoded.email
+            const requesterAccount = await userCollection.findOne({ email: requester })
+            if (requesterAccount.role === 'admin') {
+                next()
+            }
+            else {
+                return res.status(403).send({ message: 'Forbidden access' })
+            }
+        }
+
         app.get('/production', async (req, res) => {
             const production = await manufacturerCollection.find().toArray()
             res.send(production)
@@ -178,10 +206,14 @@ async function run() {
                 res.send(result)
             }
         })
+        app.get('/allorder', verifyJWT, async (req, res) => {
+            const allOrder = await orderCollection.find().toArray()
+            res.send(allOrder)
+        })
         app.get('/myorder/:id', verifyJWT, async (req, res) => {
-            const query = req.params.id
-            const id = { _id: ObjectId(query) }
-            const result = await myCollection.find(id).toArray()
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await myCollection.findOne(query)
             res.send(result)
         })
         // delete single order by user 
